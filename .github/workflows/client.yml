@@ -1124,7 +1124,7 @@ jobs:
   # tauri CLI (`tauri ios xcode-script`).
   # ---------------------------------------------------------------------------
   ios:
-    if: inputs.platform == '' || inputs.platform == 'all'
+    if: false  # FORK: not needed for the Android + Windows build
     name: build (ios, unsigned sideload ipa)
     runs-on: macos-latest
     permissions:
@@ -1239,7 +1239,7 @@ jobs:
   # there is no system libcrypto to link a static binary against.
   # ---------------------------------------------------------------------------
   cli:
-    if: inputs.platform == '' || inputs.platform == 'all'
+    if: false  # FORK: not needed for the Android + Windows build
     name: CLI static binary (${{ matrix.arch }})
     strategy:
       fail-fast: false
