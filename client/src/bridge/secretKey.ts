@@ -1,29 +1,19 @@
-// Process-wide cache around the OS-keychain Secret Key. Each keychain access can
-// trigger a prompt (esp. macOS), so we read at most ONCE per process and update
-// the cache locally after a save. Shared by boot() (startup auto-unlock) and the
-// Unlock screen so they never both hit the keychain for the same value.
+// FORK (convenience build): there is no per-account Secret Key any more. The core
+// derives the Unlock Key from the master password plus this fixed, public constant
+// (see rust-core keychain `SecretKey::fixed`), so nothing is stored in an OS
+// keychain, typed by the user, or lost with a phone. Kept as a module so every
+// existing caller keeps working unchanged.
 
-import * as api from "@/bridge/api";
+/** Hex of the fixed fork-wide Secret Key (ASCII "unissh-no-secret"). */
+export const FIXED_SECRET_KEY_HEX = "756e697373682d6e6f2d736563726574";
 
-let secretKeyRead: Promise<string | null> | null = null;
-
-/** Read the Secret Key from the OS keychain, cached for the process lifetime. */
+/** Always the fixed key; never touches a keychain. */
 export function readSecretKeyOnce(): Promise<string | null> {
-  if (!secretKeyRead) secretKeyRead = api.keychainGetSecretKey().catch(() => null);
-  return secretKeyRead;
+  return Promise.resolve(FIXED_SECRET_KEY_HEX);
 }
 
-/** Persist the Secret Key to the keychain and prime the cache so later reads
- *  don't re-prompt. The write itself is best-effort. */
-export function rememberSecretKey(key: string) {
-  secretKeyRead = Promise.resolve(key);
-  api.keychainSaveSecretKey(key).catch(() => {});
-}
+/** No-op: the key is a constant, there is nothing to remember. */
+export function rememberSecretKey(_key: string) {}
 
-/** Drop the cached Secret Key on lock / logout. JS strings can't be truly
- *  zeroized, but releasing the reference removes the long-lived guaranteed-live
- *  copy so GC can reclaim it — matching the user's "locked = secret gone from
- *  memory" expectation. Next read re-fetches from the keychain. */
-export function clearSecretKey() {
-  secretKeyRead = null;
-}
+/** No-op: the key is a constant, there is nothing to forget. */
+export function clearSecretKey() {}

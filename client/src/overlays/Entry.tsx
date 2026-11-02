@@ -23,7 +23,7 @@ import { useIsMobile, useNarrow } from "@/store/responsive";
 import { toast } from "@/store/toast";
 import { guard } from "@/store/action";
 import * as api from "@/bridge/api";
-import { readSecretKeyOnce, rememberSecretKey } from "@/bridge/secretKey";
+import { FIXED_SECRET_KEY_HEX, readSecretKeyOnce, rememberSecretKey } from "@/bridge/secretKey";
 import { logWarn } from "@/bridge/log";
 import { apiErrorMessage, type PairingPayload } from "@/bridge/types";
 import { useTranslation, Trans } from "@/i18n";
@@ -419,7 +419,8 @@ function RecoverIdentity() {
   const [baseUrl, setBaseUrl] = useState("");
   const [handle, setHandle] = useState("");
   const [password, setPassword] = useState("");
-  const [secretKey, setSecretKey] = useState("");
+  // FORK: the Secret Key is a fixed constant, never asked for.
+  const [secretKey, setSecretKey] = useState(FIXED_SECRET_KEY_HEX);
   const [busy, setBusy] = useState(false);
 
   const recover = async () => {
@@ -428,7 +429,7 @@ function RecoverIdentity() {
     try {
       await recoverInstance(baseUrl, handle, password, secretKey);
       setPassword("");
-      setSecretKey("");
+      setSecretKey(FIXED_SECRET_KEY_HEX);
     } catch (e) {
       toast(apiErrorMessage(e), "err");
     } finally {
@@ -455,10 +456,6 @@ function RecoverIdentity() {
         <Field label={t("serverCloud.identityPassword")}>
           <Input {...ENTRY_BOX} type="password" value={password} onChange={setPassword}
             placeholder={t("serverCloud.identityPasswordPlaceholder")} />
-        </Field>
-        <Field label={t("serverCloud.identitySecretKey")}>
-          <Input {...ENTRY_BOX} type="password" mono value={secretKey} onChange={setSecretKey}
-            placeholder={t("serverCloud.identitySecretKeyPlaceholder")} />
         </Field>
         <Btn onClick={() => void recover()} full disabled={busy || !baseUrl.trim() || !handle.trim() || !secretKey.trim()}>
           {busy ? <Spinner size={16} color={p.accentInk} /> : t("serverCloud.identityCta")}
@@ -715,8 +712,9 @@ function Unlock() {
   const { t } = useTranslation();
   const isMobile = useIsMobile();
   const [password, setPassword] = useState("");
-  const [secretKey, setSecretKey] = useState("");
-  const [fromKeychain, setFromKeychain] = useState(false);
+  // FORK: the Secret Key is a fixed constant, never typed; treated as "already loaded".
+  const [secretKey, setSecretKey] = useState(FIXED_SECRET_KEY_HEX);
+  const [fromKeychain, setFromKeychain] = useState(true);
   const [busy, setBusy] = useState(false);
   // Hide the master-password field for a passwordless (Secret-Key-only) instance —
   // there's nothing to type. `requiresPassword` is derived from the on-disk keyset
@@ -1056,30 +1054,6 @@ function Unlock() {
               placeholder={t("onboarding.ifSetPlaceholder")}
             />
           </Field>
-        )}
-        <Field label={t("onboarding.secretKeyFromKit")} labelGap={7}>
-          <Input
-            icon="key"
-            mono
-            {...ENTRY_BOX}
-            height={isMobile ? 50 : 46}
-            type="password"
-            value={secretKey}
-            autoFocus={!fromKeychain}
-            onChange={(v) => {
-              setSecretKey(v);
-              setFromKeychain(false);
-            }}
-            placeholder="A3-7KQX2-…"
-          />
-        </Field>
-        {fromKeychain && (
-          <div
-            style={{ display: "flex", alignItems: "center", gap: rem(6), fontSize: TEXT.small, color: p.green }}
-          >
-            <Icon name="shieldcheck" size={12} color={p.green} />
-            {t("onboarding.loadedFromKeychain")}
-          </div>
         )}
         <div style={{ margin: `${rem(5)} 0` }}>
           <Btn
@@ -1488,12 +1462,11 @@ export function EntryOverlays() {
   if (overlay === "onboarding") {
     return (
       <Onboarding
-        onCreated={(sk) => {
-          setSecretKey(sk);
-          // remember on this trusted device for quick unlock (single write)
-          rememberSecretKey(sk);
+        onCreated={() => {
+          // FORK: no Secret Key to back up, so skip the Emergency Kit screen.
           useApp.setState({ instanceExists: true, unlocked: true });
-          setOverlay("kit");
+          setOverlay(null);
+          void useApp.getState().reloadVaults();
         }}
       />
     );

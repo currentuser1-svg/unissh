@@ -622,10 +622,10 @@ const lsDevice = (): Device => {
 export const OS_LOCK_GRACE_DEFAULT = 30;
 
 /** Idle minutes before auto-lock, parsed from the Settings value. "never" → null
- *  (disabled). Defaults to 15, matching the Settings UI default. */
+ *  (disabled). FORK: defaults to "never", matching the Settings UI default. */
 const lsAutolockMin = (): number | null => {
   try {
-    const v = localStorage.getItem("unissh.autolock") ?? "15";
+    const v = localStorage.getItem("unissh.autolock") ?? "never";
     if (v === "never") return null;
     const n = parseInt(v, 10);
     return Number.isFinite(n) && n > 0 ? n : 15;

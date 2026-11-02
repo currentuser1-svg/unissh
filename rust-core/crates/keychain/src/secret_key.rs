@@ -17,6 +17,14 @@ use crate::error::KeychainError;
 /// Length of the Secret Key in bytes (128 bits of entropy).
 pub const SECRET_KEY_LEN: usize = 16;
 
+/// FORK (convenience build): every account uses this fixed "Secret Key", so the
+/// user never has to store, type or back up a second secret — the master password
+/// alone unlocks. Security consequence: the Secret Key adds no entropy any more, so
+/// a stolen DB / keyset blob can be brute-forced offline against the password alone
+/// (Argon2id still makes that expensive). Use a long password.
+/// hex: 756e697373682d6e6f2d736563726574
+pub const FIXED_SECRET_KEY: [u8; SECRET_KEY_LEN] = *b"unissh-no-secret";
+
 /// Secret Key. Zeroized on Drop. Shown to the user in the Emergency Kit
 /// (formatting the Kit is the job of the `recovery` crate, Milestone 2).
 #[derive(Clone, ZeroizeOnDrop)]
@@ -28,6 +36,11 @@ impl SecretKey {
         let mut bytes = [0_u8; SECRET_KEY_LEN];
         OsRng.fill_bytes(&mut bytes);
         Self(bytes)
+    }
+
+    /// The fixed fork-wide key (see [`FIXED_SECRET_KEY`]).
+    pub const fn fixed() -> Self {
+        Self(FIXED_SECRET_KEY)
     }
 
     /// Constructs from ready-made bytes.

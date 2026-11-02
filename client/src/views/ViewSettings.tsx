@@ -848,7 +848,7 @@ type OsLock = "off" | "0" | "30" | "60" | "300";
 type Startup = "locked" | "unlocked";
 
 function SettingsGeneral() {
-  const [lock, setLock] = useState<AutoLock>(() => lsGet("unissh.autolock", "15") as AutoLock);
+  const [lock, setLock] = useState<AutoLock>(() => lsGet("unissh.autolock", "never") as AutoLock);
   const [startup, setStartup] = useState<Startup>(
     () => lsGet("unissh.startup", "unlocked") as Startup,
   );

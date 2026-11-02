@@ -1826,6 +1826,18 @@ pub struct EscrowCreds {
     pub argon_parallelism: u32,
 }
 
+/// FORK: parses the Secret Key hex handed over by the client. An empty / blank
+/// string means "use the fixed fork key" (see `SecretKey::fixed`), so callers that
+/// no longer collect a Secret Key from the user can pass "".
+fn parse_secret_key_hex(hex_str: &str) -> Result<SecretKey, FfiError> {
+    let trimmed = hex_str.trim();
+    if trimmed.is_empty() {
+        return Ok(SecretKey::fixed());
+    }
+    let sk_bytes = Zeroizing::new(hex::decode(trimmed).map_err(|_| FfiError::InvalidCredentials)?);
+    SecretKey::from_slice(&sk_bytes).map_err(|_| FfiError::InvalidCredentials)
+}
+
 #[uniffi::export]
 impl Core {
     /// Creates the facade over the DB and keyset-sidecar paths (not yet unlocked).
@@ -2762,11 +2774,7 @@ impl Core {
         let password = password.map(Zeroizing::new);
         let secret_key_hex = Zeroizing::new(secret_key_hex);
         let enc = EncryptedKeyset::from_bytes(&keyset_blob).map_err(FfiError::other)?;
-        let sk_bytes = Zeroizing::new(
-            hex::decode(secret_key_hex.trim()).map_err(|_| FfiError::InvalidCredentials)?,
-        );
-        let secret_key =
-            SecretKey::from_slice(&sk_bytes).map_err(|_| FfiError::InvalidCredentials)?;
+        let secret_key = parse_secret_key_hex(&secret_key_hex)?;
 
         // migrate-on-open: a legacy blob (before round 2) from an old device is opened
         // via a probe and immediately re-wrapped under the current scheme — the local sidecar
@@ -2871,11 +2879,7 @@ impl Core {
     ) -> Result<EscrowCreds, FfiError> {
         let password = password.map(Zeroizing::new);
         let secret_key_hex = Zeroizing::new(secret_key_hex);
-        let sk_bytes = Zeroizing::new(
-            hex::decode(secret_key_hex.trim()).map_err(|_| FfiError::InvalidCredentials)?,
-        );
-        let secret_key =
-            SecretKey::from_slice(&sk_bytes).map_err(|_| FfiError::InvalidCredentials)?;
+        let secret_key = parse_secret_key_hex(&secret_key_hex)?;
 
         let params = KdfParams::recommended();
         // None → SecretKeyOnly account: K_auth is derived from the Secret Key alone.
@@ -2934,11 +2938,7 @@ impl Core {
         const MAX_ESCROW_PARALLELISM: u32 = 4;
         let password = password.map(Zeroizing::new);
         let secret_key_hex = Zeroizing::new(secret_key_hex);
-        let sk_bytes = Zeroizing::new(
-            hex::decode(secret_key_hex.trim()).map_err(|_| FfiError::InvalidCredentials)?,
-        );
-        let secret_key =
-            SecretKey::from_slice(&sk_bytes).map_err(|_| FfiError::InvalidCredentials)?;
+        let secret_key = parse_secret_key_hex(&secret_key_hex)?;
 
         if argon_mem_kib > MAX_ESCROW_MEM_KIB
             || argon_iterations > MAX_ESCROW_ITERATIONS
@@ -2997,11 +2997,7 @@ impl Core {
     ) -> Result<Vec<u8>, FfiError> {
         self.with_state(|state| {
             let secret_key_hex = Zeroizing::new(secret_key_hex);
-            let sk_bytes = Zeroizing::new(
-                hex::decode(secret_key_hex.trim()).map_err(|_| FfiError::InvalidCredentials)?,
-            );
-            let secret_key =
-                SecretKey::from_slice(&sk_bytes).map_err(|_| FfiError::InvalidCredentials)?;
+            let secret_key = parse_secret_key_hex(&secret_key_hex)?;
             let init = lock_recover(&handle.inner)
                 .take()
                 .ok_or_else(|| FfiError::other("onboard initiator step already consumed"))?;
@@ -7147,11 +7143,7 @@ impl Core {
     ) -> Result<(EncryptedKeyset, SecretKey), FfiError> {
         let enc_bytes = std::fs::read(&self.keyset_path).map_err(|_| FfiError::NotFound)?;
         let enc = EncryptedKeyset::from_bytes(&enc_bytes).map_err(FfiError::other)?;
-        let sk_bytes = Zeroizing::new(
-            hex::decode(secret_key_hex.trim()).map_err(|_| FfiError::InvalidCredentials)?,
-        );
-        let secret_key =
-            SecretKey::from_slice(&sk_bytes).map_err(|_| FfiError::InvalidCredentials)?;
+        let secret_key = parse_secret_key_hex(&secret_key_hex)?;
         Ok((enc, secret_key))
     }
 

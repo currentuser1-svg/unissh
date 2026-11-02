@@ -139,7 +139,7 @@ pub fn create_account(
     password: Option<&[u8]>,
     params: KdfParams,
 ) -> Result<(SecretKey, EncryptedKeyset, UnlockedKeyset), KeychainError> {
-    let secret_key = SecretKey::generate();
+    let secret_key = SecretKey::fixed(); // FORK: no per-account Secret Key
 
     let (mode, kdf_params, argon_key) = match password {
         Some(pw) => {

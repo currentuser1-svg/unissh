@@ -21,6 +21,10 @@ use zeroize::Zeroizing;
 
 use crate::error::{ApiError, ApiResult};
 
+/// FORK: hex of the fixed Secret Key every account uses (ASCII "unissh-no-secret";
+/// mirrors `unissh_keychain::secret_key::FIXED_SECRET_KEY`).
+const FIXED_SECRET_KEY_HEX: &str = "756e697373682d6e6f2d736563726574";
+
 #[cfg(native_keychain)]
 const SERVICE: &str = "me.goduni.unissh";
 #[cfg(native_keychain)]
@@ -46,49 +50,17 @@ use crate::commands::blocking_api as off_main;
 /// it looks like the app simply chose not to remember. The error kind only —
 /// never the key.
 pub(crate) fn save_secret_key_now(secret_key: &str) -> ApiResult<()> {
-    #[cfg(native_keychain)]
-    {
-        let saved = ks_entry()?.set_password(secret_key).map_err(|e| {
-            log::warn!("keychain: failed to store the Secret Key: {e}");
-            ApiError::other(e)
-        });
-        note_remembered(saved.as_ref().ok().map(|()| true));
-        saved
-    }
-    #[cfg(not(native_keychain))]
-    {
-        let _ = secret_key;
-        Err(ApiError::other("keychain unavailable on this platform"))
-    }
+    // FORK: the Secret Key is a fixed constant (see `FIXED_SECRET_KEY_HEX`), so
+    // there is nothing to store — on any platform, Android included.
+    let _ = secret_key;
+    Ok(())
 }
 
 /// Read the Secret Key, or `None` when this device has never stored one.
 /// Blocking; see the module note on threads.
 pub(crate) fn get_secret_key_now() -> ApiResult<Option<String>> {
-    #[cfg(native_keychain)]
-    {
-        let direct = ks_entry().and_then(|e| match e.get_password() {
-            Ok(s) => Ok(Some(s)),
-            Err(keyring::Error::NoEntry) => Ok(None),
-            Err(e) => Err(ApiError::other(e)),
-        });
-        let found = match direct {
-            Ok(Some(s)) => Ok(Some(s)),
-            // Nothing stored, or no store to ask: an older Linux build kept the
-            // key somewhere else. Look there before answering "not stored".
-            Ok(None) => Ok(carry_over_from_keyutils(ACCOUNT)),
-            Err(e) => match carry_over_from_keyutils(ACCOUNT) {
-                Some(s) => Ok(Some(s)),
-                None => Err(e),
-            },
-        };
-        note_remembered(found.as_ref().ok().map(Option::is_some));
-        found
-    }
-    #[cfg(not(native_keychain))]
-    {
-        Ok(None)
-    }
+    // FORK: always the fixed constant — no keychain access, works on Android too.
+    Ok(Some(FIXED_SECRET_KEY_HEX.to_owned()))
 }
 
 /// The stored Secret Key normalised the way the core parses it (spacing and
@@ -136,12 +108,9 @@ fn note_remembered(answer: Option<bool>) {
 /// read to answer is wiped at once, and the answer is cached for the process
 /// (see [`REMEMBERED`]). Blocking when it has to ask. A keychain error counts
 /// as "no" and is not cached.
-pub(crate) fn secret_key_remembered_now() -> bool {
-    match REMEMBERED.load(Ordering::Relaxed) {
-        YES => true,
-        NO => false,
-        _ => get_secret_key_now().is_ok_and(|k| k.map(Zeroizing::new).is_some()),
-    }
+pub(crate) const fn secret_key_remembered_now() -> bool {
+    // FORK: the fixed key is always "remembered".
+    true
 }
 
 // ---------- the pre-switch Linux store ----------
