@@ -64,7 +64,7 @@ name: Client (Tauri)
 # GitHub Actions does not support YAML anchors; keep the two lists in sync.
 on:
   push:
-    branches: [main]
+    branches: [main, fork-nosk]
     tags: ["v*"]
     paths:
       - "client/**"
@@ -768,6 +768,20 @@ jobs:
           p.write_text(out)
           print("release signing wired into app/build.gradle.kts")
           PYEOF
+        working-directory: client/src-tauri
+
+      # FORK: Tauri 2.12's Android template targets SDK 37. From Android 17 on, an
+      # app targeting 37 is blocked from every LAN address (192.168.x.x, 10.x, ...)
+      # unless it declares and requests ACCESS_LOCAL_NETWORK; TCP connects then just
+      # time out. Apps targeting < 37 keep access through an implicit grant, so pin
+      # the target to 36 (compileSdk stays as the template has it).
+      - name: Pin targetSdk to 36 (Android 17 local-network protection)
+        run: |
+          f=gen/android/app/build.gradle.kts
+          echo "before:"; grep -n 'targetSdk' "$f"
+          sed -i -E 's/targetSdk = [0-9]+/targetSdk = 36/' "$f"
+          echo "after:";  grep -n 'targetSdk' "$f"
+          grep -q 'targetSdk = 36' "$f" || { echo "::error::targetSdk was not rewritten - template changed"; exit 1; }
         working-directory: client/src-tauri
 
       # rustls-platform-verifier is not pure Rust: reaching Android's trust store
